@@ -8,7 +8,11 @@ import { useBankrollStore } from '@/store/useBankrollStore'
 import { formatCents, formatPctNum } from '@/lib/format'
 
 export function Dashboard() {
-  const { games, multiples, isLoadingGames, fetchTodayGames, fetchMultiples } = useGameStore()
+  const {
+    games, multiples,
+    isLoadingGames, fetchTodayGames, fetchMultiples,
+    noGamesReason, analyzedLeagues, autoDiscovery,
+  } = useGameStore()
   const { config, stats, fetchAll } = useBankrollStore()
 
   useEffect(() => {
@@ -62,7 +66,7 @@ export function Dashboard() {
           {/* Games */}
           <div>
             <h2 className="text-sm font-bold text-text-muted uppercase tracking-wider mb-4">
-              ⚡ Top 5 Jogos de Hoje
+              {autoDiscovery ? '🔍 Jogos Encontrados por Auto-Discovery' : '⚡ Top 5 Jogos de Hoje'}
             </h2>
             {isLoadingGames ? (
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -70,13 +74,44 @@ export function Dashboard() {
                   <div key={i} className="h-52 bg-surface-card border border-surface-border rounded-xl animate-pulse" />
                 ))}
               </div>
-            ) : (
+            ) : games.length > 0 ? (
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 {games.map(game => (
                   <div key={game.id} className="relative">
                     <GameCard game={game} />
                   </div>
                 ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-4 py-16 px-6 text-center border border-dashed border-surface-border rounded-xl bg-surface-card">
+                <span className="text-4xl">📅</span>
+                <div className="space-y-1">
+                  <p className="text-text-primary font-semibold text-base">
+                    Sem jogos reais hoje
+                  </p>
+                  <p className="text-text-muted text-sm">
+                    Data consultada:{' '}
+                    {new Date().toLocaleDateString('pt-PT', {
+                      weekday: 'long',
+                      year:    'numeric',
+                      month:   'long',
+                      day:     'numeric',
+                    })}
+                  </p>
+                </div>
+                {noGamesReason && (
+                  <p className="text-text-muted text-sm max-w-sm leading-relaxed">
+                    {noGamesReason}
+                  </p>
+                )}
+                {analyzedLeagues.length > 0 && (
+                  <div className="text-xs text-text-muted max-w-md">
+                    <p className="font-semibold mb-1 uppercase tracking-wider">
+                      Competições analisadas
+                    </p>
+                    <p className="leading-relaxed">{analyzedLeagues.join(' · ')}</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
