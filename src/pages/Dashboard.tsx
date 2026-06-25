@@ -7,11 +7,17 @@ import { useGameStore } from '@/store/useGameStore'
 import { useBankrollStore } from '@/store/useBankrollStore'
 import { formatCents, formatPctNum } from '@/lib/format'
 
+function fmtDate(iso: string): string {
+  return new Date(iso + 'T12:00:00').toLocaleDateString('pt-PT', {
+    weekday: 'short', day: 'numeric', month: 'short',
+  })
+}
+
 export function Dashboard() {
   const {
     games, multiples,
     isLoadingGames, fetchTodayGames, fetchMultiples,
-    noGamesReason, analyzedLeagues, autoDiscovery,
+    noGamesReason, analyzedLeagues, autoDiscovery, gamesDate,
   } = useGameStore()
   const { config, stats, fetchAll } = useBankrollStore()
 
@@ -21,14 +27,28 @@ export function Dashboard() {
     fetchAll()
   }, [])
 
+  const today = new Date().toISOString().slice(0, 10)
+  const isFutureDate = gamesDate != null && gamesDate !== today
+
   const raspadinha = multiples.find(m => m.strategy === 'RASPADINHA')
   const regularMultiples = multiples.filter(m => m.strategy !== 'RASPADINHA')
+
+  const topBarSubtitle =
+    games.length > 0 && isFutureDate
+      ? `${games.length} jogos em destaque · ${fmtDate(gamesDate!)}`
+      : `${games.length} jogos em destaque hoje`
+
+  const sectionHeading = autoDiscovery
+    ? '🔍 Jogos Encontrados por Auto-Discovery'
+    : isFutureDate
+      ? `⚡ Top 5 Jogos · ${new Date(gamesDate! + 'T12:00:00').toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' })}`
+      : '⚡ Top 5 Jogos de Hoje'
 
   return (
     <div className="flex-1 flex flex-col animate-fade-in">
       <TopBar
         title="Dashboard"
-        subtitle={`${games.length} jogos em destaque hoje`}
+        subtitle={topBarSubtitle}
         onRefresh={fetchTodayGames}
         isRefreshing={isLoadingGames}
       />
@@ -66,7 +86,7 @@ export function Dashboard() {
           {/* Games */}
           <div>
             <h2 className="text-sm font-bold text-text-muted uppercase tracking-wider mb-4">
-              {autoDiscovery ? '🔍 Jogos Encontrados por Auto-Discovery' : '⚡ Top 5 Jogos de Hoje'}
+              {sectionHeading}
             </h2>
             {isLoadingGames ? (
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -84,18 +104,14 @@ export function Dashboard() {
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center gap-4 py-16 px-6 text-center border border-dashed border-surface-border rounded-xl bg-surface-card">
-                <span className="text-4xl">📅</span>
+                <span className="text-4xl">&#x1F4C5;</span>
                 <div className="space-y-1">
                   <p className="text-text-primary font-semibold text-base">
-                    Sem jogos reais hoje
+                    Sem jogos agendados
                   </p>
                   <p className="text-text-muted text-sm">
-                    Data consultada:{' '}
                     {new Date().toLocaleDateString('pt-PT', {
-                      weekday: 'long',
-                      year:    'numeric',
-                      month:   'long',
-                      day:     'numeric',
+                      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
                     })}
                   </p>
                 </div>
@@ -120,11 +136,23 @@ export function Dashboard() {
         {/* Right panel: combinadas + raspadinha */}
         <aside className="w-[340px] shrink-0 border-l border-surface-border overflow-y-auto p-5 space-y-4">
           <h2 className="text-xs font-bold text-text-muted uppercase tracking-wider">
-            🔗 Combinadas do Dia
+            Combinadas do Dia
           </h2>
-          {regularMultiples.map(m => (
-            <MultipleCard key={m.id} multiple={m} />
-          ))}
+
+          {regularMultiples.length > 0 ? (
+            regularMultiples.map(m => (
+              <MultipleCard key={m.id} multiple={m} />
+            ))
+          ) : (
+            <div className="flex flex-col items-center gap-2 py-10 text-center">
+              <span className="text-3xl">&#x1F517;</span>
+              <p className="text-text-muted text-xs leading-relaxed">
+                Sem combinadas disponíveis.
+                <br />
+                Requer jogos reais detectados.
+              </p>
+            </div>
+          )}
 
           {raspadinha && (
             <div>

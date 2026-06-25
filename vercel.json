@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    { "source": "/api/apisports/(.*)", "destination": "/api/apisports/[...path]" },
+    { "source": "/api/fd/(.*)",        "destination": "/api/fd/[...path]" },
+    { "source": "/api/sofa/(.*)",      "destination": "/api/sofa/[...path]" }
+  ],
+  "functions": {
+    "api/apisports/[...path].ts": { "memory": 256, "maxDuration": 10 },
+    "api/fd/[...path].ts":        { "memory": 256, "maxDuration": 10 },
+    "api/sofa/[...path].ts":      { "memory": 256, "maxDuration": 10 }
+  }
+}

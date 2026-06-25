@@ -5,8 +5,10 @@ import { GameDetail } from '@/pages/GameDetail'
 import { History } from '@/pages/History'
 import { BankrollPage } from '@/pages/BankrollPage'
 import { DailyPlan } from '@/pages/DailyPlan'
+import { DiagnosticsPage } from '@/pages/DiagnosticsPage'
+import { SofaDebugPage } from '@/pages/SofaDebugPage'
+import { RapidApiDebugPage } from '@/pages/RapidApiDebugPage'
 
-// Sprint 2+ placeholders — avoids blank pages on nav click
 function ComingSoon({ label }: { label: string }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-3 text-text-muted">
@@ -28,6 +30,9 @@ export default function App() {
         <Route path="/performance"   element={<ComingSoon label="Dashboard de Performance" />} />
         <Route path="/banca"         element={<BankrollPage />} />
         <Route path="/definicoes"    element={<ComingSoon label="Definições" />} />
+        <Route path="/diagnostico"   element={<DiagnosticsPage />} />
+        <Route path="/debug-sofa"    element={<SofaDebugPage />} />
+        <Route path="/debug-rapidapi" element={<RapidApiDebugPage />} />
         <Route path="*"              element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

@@ -1,9 +1,9 @@
 // ─── useApiStatus ─────────────────────────────────────────────────────────────
-// Exposes runtime API state to any component that needs it.
-// Used by the Sidebar to show quota and mock-mode indicators.
+// Exposes runtime API state to the Sidebar.
+// After TheSportsDB migration: no API key, no daily call limit.
+// Interface kept identical so Sidebar.tsx requires no changes.
 
 import { useState, useEffect } from 'react'
-import { getApiCallCount, getRemainingCalls } from '@/lib/apiFootball'
 import { apiCache } from '@/lib/cache'
 
 export interface ApiStatus {
@@ -14,38 +14,32 @@ export interface ApiStatus {
   hasApiKey:      boolean
 }
 
-/**
- * Polls API status every 10 seconds.
- * Lightweight — only reads counters already in memory, no network calls.
- */
 export function useApiStatus(): ApiStatus {
-  const hasApiKey  = Boolean(import.meta.env.VITE_API_FOOTBALL_KEY?.trim())
-  const isMockMode = import.meta.env.VITE_USE_MOCK === 'true' || !hasApiKey
+  // TheSportsDB is free — no key required and no documented call limit.
+  const isMockMode = import.meta.env.VITE_USE_MOCK === 'true'
 
   const [status, setStatus] = useState<ApiStatus>({
     isMockMode,
-    callsUsed:      getApiCallCount(),
-    callsRemaining: getRemainingCalls(),
+    callsUsed:      0,
+    callsRemaining: 9999,   // TheSportsDB: effectively unlimited
     cacheSize:      apiCache.size,
-    hasApiKey,
+    hasApiKey:      true,   // no key needed — always "available"
   })
 
   useEffect(() => {
     const refresh = () => {
       setStatus({
         isMockMode,
-        callsUsed:      getApiCallCount(),
-        callsRemaining: getRemainingCalls(),
+        callsUsed:      0,
+        callsRemaining: 9999,
         cacheSize:      apiCache.size,
-        hasApiKey,
+        hasApiKey:      true,
       })
     }
-
-    // Update on mount and every 10 s
     refresh()
     const interval = setInterval(refresh, 10_000)
     return () => clearInterval(interval)
-  }, [isMockMode, hasApiKey])
+  }, [isMockMode])
 
   return status
 }

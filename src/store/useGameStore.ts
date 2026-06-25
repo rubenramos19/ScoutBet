@@ -15,6 +15,7 @@ interface GameState {
   noGamesReason:    string | null   // human-readable reason when games === []
   autoDiscovery:    boolean         // true if games came from auto-discovery
   analyzedLeagues:  string[]        // labels of every competition checked
+  gamesDate:        string | null   // ISO date of games shown (may differ from today)
 
   fetchTodayGames: () => Promise<void>
   selectGame:      (id: string) => Promise<void>
@@ -33,6 +34,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   noGamesReason:   null,
   autoDiscovery:   false,
   analyzedLeagues: [],
+  gamesDate:       null,
 
   fetchTodayGames: async () => {
     if (get().isLoadingGames) return
@@ -47,7 +49,10 @@ export const useGameStore = create<GameState>((set, get) => ({
         noGamesReason:   meta.noGamesReason,
         autoDiscovery:   meta.autoDiscovery,
         analyzedLeagues: meta.analyzedLeagues,
+        gamesDate:       meta.gamesDate,
       })
+      // Build combinadas from real games (non-blocking)
+      gameService.getMultipleSuggestions().then(multiples => set({ multiples })).catch(() => {})
     } catch (e) {
       set({ error: 'Erro ao carregar jogos do dia.', isLoadingGames: false })
     }

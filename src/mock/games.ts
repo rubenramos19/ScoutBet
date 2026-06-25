@@ -49,7 +49,7 @@ export const MOCK_GAMES: Game[] = [
     odds: { homeWin: 2.10, draw: 3.40, awayWin: 3.20, bttsYes: 1.75, bttsNo: 2.05, over25: 1.60, under25: 2.25, bookmaker: 'Bet365', fetchedAt: new Date().toISOString() },
     dataQualityScore: 85,
     featuredRank: 1,
-    homeScore: null, awayScore: null,
+    homeScore: null, awayScore: null, liveMinute: null,
   },
   {
     id: 'game-2',
@@ -89,7 +89,7 @@ export const MOCK_GAMES: Game[] = [
     odds: { homeWin: 2.30, draw: 3.20, awayWin: 2.90, bttsYes: 1.72, bttsNo: 2.10, over25: 1.75, under25: 2.05, bookmaker: 'Bet365', fetchedAt: new Date().toISOString() },
     dataQualityScore: 78,
     featuredRank: 2,
-    homeScore: null, awayScore: null,
+    homeScore: null, awayScore: null, liveMinute: null,
   },
   {
     id: 'game-3',
@@ -130,7 +130,7 @@ export const MOCK_GAMES: Game[] = [
     odds: { homeWin: 1.85, draw: 3.60, awayWin: 3.80, bttsYes: 1.90, bttsNo: 1.90, over25: 1.95, under25: 1.85, bookmaker: 'Bet365', fetchedAt: new Date().toISOString() },
     dataQualityScore: 82,
     featuredRank: 3,
-    homeScore: null, awayScore: null,
+    homeScore: null, awayScore: null, liveMinute: null,
   },
   {
     id: 'game-4',
@@ -168,7 +168,7 @@ export const MOCK_GAMES: Game[] = [
     odds: { homeWin: 2.50, draw: 3.10, awayWin: 2.60, bttsYes: 1.65, bttsNo: 2.20, over25: 1.70, under25: 2.10, bookmaker: 'Bet365', fetchedAt: new Date().toISOString() },
     dataQualityScore: 70,
     featuredRank: 4,
-    homeScore: null, awayScore: null,
+    homeScore: null, awayScore: null, liveMinute: null,
   },
   {
     id: 'game-5',
@@ -208,7 +208,7 @@ export const MOCK_GAMES: Game[] = [
     odds: { homeWin: 1.75, draw: 3.50, awayWin: 4.20, bttsYes: 2.00, bttsNo: 1.80, over25: 1.85, under25: 1.95, bookmaker: 'Bet365', fetchedAt: new Date().toISOString() },
     dataQualityScore: 88,
     featuredRank: 5,
-    homeScore: null, awayScore: null,
+    homeScore: null, awayScore: null, liveMinute: null,
   },
 ]
 

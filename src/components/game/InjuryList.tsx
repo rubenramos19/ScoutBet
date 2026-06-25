@@ -4,7 +4,7 @@ import type { Injury } from '@/types'
 const severityConfig = {
   high:    { dot: 'bg-accent-loss', text: 'text-accent-loss', badge: 'bg-accent-lossBg border-accent-loss/30 text-accent-loss' },
   medium:  { dot: 'bg-accent-draw', text: 'text-accent-draw', badge: 'bg-accent-drawBg border-accent-draw/30 text-accent-draw' },
-  low:     { dot: 'bg-accent-win',  text: 'text-accent-win',  badge: 'bg-accent-winBg  border-accent-win/30  text-accent-win' },
+  low:     { dot: 'bg-accent-win',  text: 'text-accent-win',  badge: 'bg-accent-winBg  border-accent-win/30  text-accent-win'  },
   unknown: { dot: 'bg-text-muted',  text: 'text-text-muted',  badge: 'bg-surface-raised border-surface-border text-text-muted' },
 }
 
@@ -15,9 +15,13 @@ interface InjuryListProps {
 export function InjuryList({ injuries }: InjuryListProps) {
   if (injuries.length === 0) {
     return (
-      <div className="flex items-center gap-2 py-6 justify-center">
-        <span className="text-accent-win text-lg">✓</span>
-        <span className="text-sm text-text-secondary">Sem lesões reportadas</span>
+      <div className="flex flex-col items-center gap-2 py-6 text-center">
+        <span className="text-2xl">🔒</span>
+        <p className="text-sm text-text-muted">Dados de lesões não disponíveis</p>
+        <p className="text-xs text-text-muted/60 max-w-xs leading-relaxed">
+          A API ESPN pública não fornece informação de lesões.
+          Consulta os sites oficiais das equipas ou Transfermarkt antes de apostar.
+        </p>
       </div>
     )
   }

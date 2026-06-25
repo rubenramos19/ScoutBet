@@ -1,17 +1,20 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  /** API-Football key from RapidAPI / api-sports.io */
+  /** API-Football key (legacy) */
   readonly VITE_API_FOOTBALL_KEY: string
-  /** Set to "true" to force mock data regardless of API key */
+  /** Set to "true" to force mock data */
   readonly VITE_USE_MOCK: string
-  /** Current football season year, e.g. "2024" */
+  /** Current football season year */
   readonly VITE_FOOTBALL_SEASON: string
-  /**
-   * Comma-separated league IDs to watch.
-   * Defaults: 2=UCL, 3=UEL, 39=PL, 140=LaLiga, 78=Bundesliga, 135=SerieA, 61=Ligue1, 94=Primeira
-   */
+  /** Comma-separated league IDs */
   readonly VITE_WATCHED_LEAGUES: string
+  /**
+   * RapidAPI key for SofaScore.
+   * https://rapidapi.com/search/sofascore
+   * Set in .env: VITE_RAPIDAPI_KEY=your_key_here
+   */
+  readonly VITE_RAPIDAPI_KEY: string
 }
 
 interface ImportMeta {

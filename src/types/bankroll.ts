@@ -3,7 +3,9 @@
 // Kelly Criterion is NOT in Sprint 1 — flat staking only (audit K-01).
 
 export type RiskProfile = 'CONSERVATIVE' | 'BALANCED' | 'AGGRESSIVE'
-export type PlanStatus = 'PROPOSED' | 'ACCEPTED' | 'SETTLED'
+export type PlanStatus  = 'PROPOSED' | 'ACCEPTED' | 'SETTLED'
+/** PCT = percentage of bankroll per bet; FIXED = fixed daily session budget */
+export type StakeMode   = 'PCT' | 'FIXED'
 
 export interface BankrollConfig {
   id: string
@@ -18,6 +20,10 @@ export interface BankrollConfig {
   stopLossEnabled: boolean
   stopLossPct: number
   raspadinhaEnabled: boolean
+  /** Staking mode: percentage-based or fixed daily budget */
+  stakeMode: StakeMode
+  /** Fixed daily budget in cents (used when stakeMode === 'FIXED') */
+  sessionBudgetCents: number | null
   updatedAt: string
 }
 
@@ -25,15 +31,15 @@ export interface BankrollConfig {
 export interface LedgerEntry {
   id: string
   type: 'BET_PLACED' | 'BET_WON' | 'BET_LOST' | 'BET_VOID' | 'MANUAL_ADJUSTMENT'
-  amountCents: number   // positive = credit, negative = debit
+  amountCents: number
   balanceAfterCents: number
-  reference: string     // bet ID or description
+  reference: string
   createdAt: string
 }
 
 /** Daily snapshot for bankroll evolution chart */
 export interface BankrollSnapshot {
-  date: string       // YYYY-MM-DD in user local time
+  date: string
   amountCents: number
   dailyPLCents: number
 }
@@ -44,7 +50,7 @@ export interface StakeSuggestion {
   suggestedStakeCents: number
   stakePct: number
   potentialReturnCents: number
-  method: 'FLAT'  // 'KELLY' added in Sprint 7 after calibration
+  method: 'FLAT'
   reasoning: string
 }
 
@@ -57,7 +63,7 @@ export interface DailyPlan {
   status: PlanStatus
   bets: DailyPlanBet[]
   raspadinha: RaspadinhaSuggestion | null
-  projectedReturnCents: number  // if ALL bets win
+  projectedReturnCents: number
 }
 
 export interface DailyPlanBet {
@@ -74,7 +80,7 @@ export interface DailyPlanBet {
 export interface RaspadinhaSuggestion {
   selections: Array<{ gameLabel: string; pick: string; odd: number }>
   totalOdd: number
-  stakeCents: number  // always capped at 1% bankroll / month budget
+  stakeCents: number
   potentialReturnCents: number
 }
 
@@ -85,12 +91,12 @@ export interface PerformanceStats {
   wins: number
   losses: number
   voids: number
-  accuracyRate: number        // wins / (wins + losses)
-  totalStakedCents: number | null   // null if no placed bets
+  accuracyRate: number
+  totalStakedCents: number | null
   totalReturnCents: number | null
   profitLossCents: number | null
-  roi: number | null          // null without stakes (audit R-01)
+  roi: number | null
   yield: number | null
-  currentStreak: number       // positive = win streak, negative = loss streak
+  currentStreak: number
   bestStreak: number
 }

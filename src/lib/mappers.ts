@@ -1,6 +1,8 @@
 // ─── API → Internal Type Mappers ─────────────────────────────────────────────
 // Pure functions: (raw API data) → (internal types).
 // No side-effects, no async calls. If the API shape changes, only fix here.
+//
+// Rule: NEVER return invented defaults. If data is missing, return null.
 
 import type {
   ApiFixture,
@@ -70,15 +72,14 @@ export function mapTeamSummary(
   }
 }
 
-/** Generate a 2–3 char abbreviation from a team name */
 function abbreviate(name: string): string {
   const words = name.trim().split(/\s+/)
   if (words.length === 1) return name.slice(0, 3).toUpperCase()
-  // Multi-word: take first letter of each word, max 3 chars
   return words.map(w => w[0]).join('').toUpperCase().slice(0, 3)
 }
 
 // ── TeamStats ─────────────────────────────────────────────────────────────────
+// Only returns real data from the API. No invented defaults.
 
 export function mapTeamStats(
   raw: ApiTeamStats,
@@ -87,26 +88,24 @@ export function mapTeamStats(
   const played = raw.fixtures.played[venue]
   const wins   = raw.fixtures.wins[venue]
 
-  const avgFor     = parseFloat(raw.goals.for.average[venue]     ?? '0') || 0
-  const avgAgainst = parseFloat(raw.goals.against.average[venue] ?? '0') || 0
-  const avgTotal   = avgFor + avgAgainst
+  const avgFor     = parseFloat(raw.goals.for.average[venue]     ?? '0') || null
+  const avgAgainst = parseFloat(raw.goals.against.average[venue] ?? '0') || null
 
-  // Heuristic estimates — real BTTS/Over requires per-fixture data (costly).
-  // Sprint 6 will refine with historical fixture analysis.
-  const bttsPct   = Math.round(clamp(avgFor * 20 + avgAgainst * 18, 20, 92))
-  const over25Pct = Math.round(clamp(avgTotal * 22, 20, 88))
-
+  // BTTS and over2.5 require per-fixture data which we don't fetch on free tier.
+  // Returning null is honest; the UI will show 'Dados indisponíveis'.
   return {
     teamId:          String(raw.team.id),
     goalsForAvg:     avgFor,
     goalsAgainstAvg: avgAgainst,
-    homeWinPct:      played > 0 ? Math.round((wins / played) * 100) : 50,
-    awayWinPct:      played > 0 ? Math.round((wins / played) * 100) : 40,
+    homeWinPct:      played > 0 ? Math.round((wins / played) * 100) : null,
+    awayWinPct:      played > 0 ? Math.round((wins / played) * 100) : null,
     formLast5:       mapFormString(raw.form, 5),
     formLast10:      mapFormString(raw.form, 10),
-    cleanSheets:     raw.clean_sheet[venue],
-    bttsPct,
-    over25Pct,
+    cleanSheets:     raw.fixtures.played.total > 0
+      ? Math.round((raw.clean_sheet[venue] / raw.fixtures.played.total) * 100)
+      : null,
+    bttsPct:         null,  // requires per-fixture fetch (Sprint 6)
+    over25Pct:       null,  // requires per-fixture fetch (Sprint 6)
   }
 }
 
@@ -130,7 +129,6 @@ export function mapH2H(fixtures: ApiFixture[], homeTeamId: number): H2HRecord {
       if (hGoals > aGoals) { homeWins++; results.push('H') }
       else                  { awayWins++; results.push('A') }
     } else {
-      // Fixture was played at the away team's ground — perspective is reversed
       if (aGoals > hGoals) { homeWins++; results.push('H') }
       else                  { awayWins++; results.push('A') }
     }
@@ -140,10 +138,10 @@ export function mapH2H(fixtures: ApiFixture[], homeTeamId: number): H2HRecord {
     homeWins,
     draws,
     awayWins,
-    last5:        results,
+    last5:         results,
     avgTotalGoals: last5.length > 0
       ? parseFloat((totalGoals / last5.length).toFixed(1))
-      : 2.5,
+      : null,
   }
 }
 
@@ -173,9 +171,8 @@ export function mapInjuries(
   return raw
     .filter(inj => teamNames.includes(inj.team.name))
     .map(inj => {
-      const type:     string        = inj.player.type ?? inj.player.reason ?? 'Unknown'
+      const type:     string         = inj.player.type ?? inj.player.reason ?? 'Unknown'
       const severity: InjurySeverity = SEVERITY_MAP[type] ?? 'unknown'
-
       return {
         player:      inj.player.name,
         team:        inj.team.name,
@@ -191,29 +188,51 @@ export function mapInjuries(
 // ── GameStats ─────────────────────────────────────────────────────────────────
 
 export function mapGameStats(home: TeamStats, away: TeamStats): GameStats {
+  function avg(a: number | null, b: number | null): number | null {
+    if (a == null || b == null) return null
+    return parseFloat(((a + b) / 2).toFixed(1))
+  }
   return {
-    avgGoals:   parseFloat(((home.goalsForAvg + away.goalsForAvg) / 2).toFixed(1)),
-    bttsPct:    Math.round((home.bttsPct   + away.bttsPct)   / 2),
-    over25Pct:  Math.round((home.over25Pct + away.over25Pct) / 2),
+    avgGoals:   avg(home.goalsForAvg,  away.goalsForAvg),
+    bttsPct:    avg(home.bttsPct,      away.bttsPct),
+    over25Pct:  avg(home.over25Pct,    away.over25Pct),
     homeWinPct: home.homeWinPct,
   }
 }
 
-// ── Players in form ───────────────────────────────────────────────────────────
-// We skip /players calls in Sprint 2 to stay within the 100/day budget.
-// The ApiStandingRow type is declared here for use in Sprint 3.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export type { ApiStandingRow }
+// ── Empty H2H (when fetch fails) ─────────────────────────────────────────────
+
+export function emptyH2H(): H2HRecord {
+  return { homeWins: 0, draws: 0, awayWins: 0, last5: [], avgTotalGoals: null }
+}
+
+// ── Null TeamStats (when fetch fails) ────────────────────────────────────────
+// Returns a stats object with all fields null — no invented numbers.
+
+export function nullTeamStats(teamId: string): TeamStats {
+  return {
+    teamId,
+    goalsForAvg:     null,
+    goalsAgainstAvg: null,
+    homeWinPct:      null,
+    awayWinPct:      null,
+    formLast5:       [],
+    formLast10:      [],
+    cleanSheets:     null,
+    bttsPct:         null,
+    over25Pct:       null,
+  }
+}
 
 // ── Full Game mapper ──────────────────────────────────────────────────────────
 
 export interface GameMapperInput {
-  fixture:      ApiFixture
-  homeStats:    ApiTeamStats | null
-  awayStats:    ApiTeamStats | null
-  h2hFixtures:  ApiFixture[]
-  injuries:     ApiInjury[]
-  rank:         number
+  fixture:     ApiFixture
+  homeStats:   ApiTeamStats | null
+  awayStats:   ApiTeamStats | null
+  h2hFixtures: ApiFixture[]
+  injuries:    ApiInjury[]
+  rank:        number
 }
 
 export function mapGame(input: GameMapperInput): Game {
@@ -224,20 +243,19 @@ export function mapGame(input: GameMapperInput): Game {
 
   const homeTeamStats = homeStats
     ? mapTeamStats(homeStats, 'home')
-    : buildFallbackStats(homeTeam.id)
+    : nullTeamStats(homeTeam.id)
 
   const awayTeamStats = awayStats
     ? mapTeamStats(awayStats, 'away')
-    : buildFallbackStats(awayTeam.id)
+    : nullTeamStats(awayTeam.id)
 
-  const h2h             = mapH2H(h2hFixtures, fixture.teams.home.id)
-  const stats           = mapGameStats(homeTeamStats, awayTeamStats)
-  const mappedInjuries  = mapInjuries(injuries, [
+  const h2h            = mapH2H(h2hFixtures, fixture.teams.home.id)
+  const stats          = mapGameStats(homeTeamStats, awayTeamStats)
+  const mappedInjuries = mapInjuries(injuries, [
     fixture.teams.home.name,
     fixture.teams.away.name,
   ])
 
-  // Build partial game first (without DQS) so we can pass it to the scorer
   const partial: Omit<Game, 'dataQualityScore'> = {
     id:            `fixture-${fixture.fixture.id}`,
     fixtureId:     fixture.fixture.id,
@@ -252,24 +270,30 @@ export function mapGame(input: GameMapperInput): Game {
     homeTeamStats,
     awayTeamStats,
     injuries:      mappedInjuries,
-    playersInForm: [],    // Sprint 3: /players endpoint
+    playersInForm: [],
     h2h,
     stats,
-    odds:          null,  // Sprint 2b: The Odds API
+    odds:          null,
     featuredRank:  rank > 0 ? rank : null,
     homeScore:     fixture.goals.home,
     awayScore:     fixture.goals.away,
+    liveMinute:    null,
   }
 
   const dqs = calculateDataQualityScore({ ...partial, dataQualityScore: 0 } as Game)
   return { ...partial, dataQualityScore: dqs.total }
 }
 
-// ── League prestige score (for ranking fixtures before fetching details) ───────
+// ── League prestige score ─────────────────────────────────────────────────────
 
 const LEAGUE_PRESTIGE: Record<number, number> = {
-  2:   10,  // UEFA Champions League
-  3:   8,   // UEFA Europa League
+  1:   13,  // FIFA World Cup
+  4:   12,  // UEFA Euro
+  9:   11,  // Copa America
+  2:   11,  // UEFA Champions League
+  15:  10,  // FIFA Club World Cup
+  3:   9,   // UEFA Europa League
+  848: 8,   // UEFA Conference League
   39:  9,   // Premier League
   140: 9,   // La Liga
   78:  8,   // Bundesliga
@@ -279,31 +303,13 @@ const LEAGUE_PRESTIGE: Record<number, number> = {
 }
 
 export function fixturePrestigeScore(fixture: ApiFixture): number {
-  const leagueScore = LEAGUE_PRESTIGE[fixture.league.id] ?? 5
-  // Slightly prefer upcoming (NS) over live, to surface pre-game analysis
-  const statusBonus = fixture.fixture.status.short === 'NS' ? 2 : 0
-  return leagueScore + statusBonus
+  const leagueScore  = LEAGUE_PRESTIGE[fixture.league.id] ?? 5
+  const statusShort  = fixture.fixture.status.short
+  const liveBonus    = (statusShort === '1H' || statusShort === '2H' || statusShort === 'HT') ? 3 : 0
+  const upcomingBonus = statusShort === 'NS' ? 1 : 0
+  return leagueScore + liveBonus + upcomingBonus
 }
 
-// ── Fallback stats when the API call is unavailable ──────────────────────────
+// ── Re-export for compatibility ───────────────────────────────────────────────
 
-function buildFallbackStats(teamId: string): TeamStats {
-  return {
-    teamId,
-    goalsForAvg:     1.5,
-    goalsAgainstAvg: 1.2,
-    homeWinPct:      45,
-    awayWinPct:      35,
-    formLast5:       [],
-    formLast10:      [],
-    cleanSheets:     0,
-    bttsPct:         52,
-    over25Pct:       48,
-  }
-}
-
-// ── Utility ───────────────────────────────────────────────────────────────────
-
-function clamp(v: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, v))
-}
+export type { ApiStandingRow }

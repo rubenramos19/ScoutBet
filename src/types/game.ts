@@ -1,6 +1,7 @@
 // ─── Game & Team Types ────────────────────────────────────────────────────────
-// These mirror the DB schema (spec section 4). Sprint 2 will map API responses
-// to these types in the service layer — the rest of the app never changes.
+// Sprint 3: All numeric stats are now number | null.
+// null = "dado não disponível" — never show invented defaults.
+// Components must handle null by rendering "Dados indisponíveis" or "—".
 
 export type FormResult = 'W' | 'D' | 'L'
 export type H2HResult  = 'H' | 'A' | 'D'
@@ -18,21 +19,29 @@ export interface TeamSummary {
   name: string
   shortName: string
   logoUrl: string | null
-  /** Emoji fallback until real logos are fetched (Sprint 2) */
+  /** Emoji fallback (flag or club) */
   logoEmoji?: string
 }
 
 export interface TeamStats {
   teamId: string
-  goalsForAvg: number
-  goalsAgainstAvg: number
-  homeWinPct: number
-  awayWinPct: number
-  formLast5: FormResult[]
-  formLast10: FormResult[]
-  cleanSheets: number
-  bttsPct: number
-  over25Pct: number
+  /** null when match history unavailable */
+  goalsForAvg:     number | null
+  goalsAgainstAvg: number | null
+  homeWinPct:      number | null
+  awayWinPct:      number | null
+  /** Empty array = no data; non-empty = real results */
+  formLast5:       FormResult[]
+  formLast10:      FormResult[]
+  /** % of games with 0 goals conceded; null if no data */
+  cleanSheets:     number | null
+  bttsPct:         number | null
+  over25Pct:       number | null
+  /** Optional extended stats (SofaScore only) */
+  over15Pct?:      number | null
+  under25Pct?:     number | null
+  avgRating?:      number | null
+  gamesAnalyzed?:  number
 }
 
 export interface Injury {
@@ -47,28 +56,37 @@ export interface Injury {
 }
 
 export interface PlayerInForm {
-  player: string
-  team: string
-  goalsLast5: number
-  assistsLast5: number
-  goalsSeason: number
-  assistsSeason: number
-  ratingAvg: number | null
+  player:        string
+  team:          string
+  /** null = not available from this source */
+  goalsLast5:    number | null
+  assistsLast5:  number | null
+  goalsSeason:   number | null
+  assistsSeason: number | null
+  ratingAvg:     number | null
+  /** Optional: populated by SofaScore lineups */
+  position?:     string | null
+  jerseyNumber?: string | null
 }
 
 export interface H2HRecord {
-  homeWins: number
-  draws: number
-  awayWins: number
-  last5: H2HResult[]
-  avgTotalGoals: number
+  homeWins:     number
+  draws:        number
+  awayWins:     number
+  /** null = individual match list not available from this source */
+  last5:        H2HResult[]
+  /** null = not available from this source */
+  avgTotalGoals: number | null
+  /** homeWins + draws + awayWins */
+  totalGames?:  number
 }
 
 export interface GameStats {
-  avgGoals: number
-  bttsPct: number
-  over25Pct: number
-  homeWinPct: number
+  /** null when team stats unavailable */
+  avgGoals:   number | null
+  bttsPct:    number | null
+  over25Pct:  number | null
+  homeWinPct: number | null
 }
 
 export interface ScoreBreakdown {
@@ -112,8 +130,11 @@ export interface Game {
   h2h: H2HRecord
   stats: GameStats
   odds: GameOdds | null
-  dataQualityScore: number   // 0–100 data completeness (spec: separate from probability)
-  featuredRank: number | null // 1–5 if in today's top 5, null otherwise
+  /** 0–100 data completeness score (NOT a probability) */
+  dataQualityScore: number
+  featuredRank: number | null
   homeScore: number | null
   awayScore: number | null
+  /** Live match minute — only set when status === LIVE */
+  liveMinute: string | null
 }

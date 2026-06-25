@@ -11,6 +11,8 @@ export const MOCK_BANKROLL: BankrollConfig = {
   stopLossEnabled: false,
   stopLossPct: 0.10,
   raspadinhaEnabled: true,
+  stakeMode: 'PCT',
+  sessionBudgetCents: null,
   updatedAt: new Date().toISOString(),
 }
 

@@ -1,12 +1,27 @@
 import { useNavigate } from 'react-router-dom'
-import { Clock } from 'lucide-react'
+import { Clock, Radio } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { FormStrip } from '@/components/ui/FormBadge'
 import { ScoreRing } from '@/components/ui/ConfidenceBar'
-import { OddBadge } from '@/components/ui/OddBadge'
 import { Badge } from '@/components/ui/Badge'
 import { formatTime } from '@/lib/format'
+import { cn } from '@/lib/cn'
 import type { Game } from '@/types'
+
+function TeamLogo({ logoUrl, name, size = 'sm' }: { logoUrl: string | null; name: string; size?: 'sm' | 'md' }) {
+  const px = size === 'sm' ? 'w-7 h-7' : 'w-9 h-9'
+  if (logoUrl) {
+    return (
+      <img
+        src={logoUrl}
+        alt={name}
+        className={cn(px, 'object-contain rounded-sm shrink-0')}
+        onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+      />
+    )
+  }
+  return <span className={cn(px, 'flex items-center justify-center text-lg shrink-0')}>⚽</span>
+}
 
 interface GameCardProps {
   game: Game
@@ -14,60 +29,107 @@ interface GameCardProps {
 
 export function GameCard({ game }: GameCardProps) {
   const navigate = useNavigate()
-
-  // Best simple pick from rules (Sprint 3 will use full scoring)
-  const topPick = game.odds
-    ? game.odds.homeWin <= 2.00
-      ? { pick: `${game.homeTeam.shortName} Vence`, odd: game.odds.homeWin }
-      : game.odds.bttsYes <= 1.80
-        ? { pick: 'Ambas Marcam', odd: game.odds.bttsYes }
-        : { pick: 'Over 2.5 Golos', odd: game.odds.over25 }
-    : null
+  const isLive     = game.status === 'LIVE'
+  const isFinished = game.status === 'FINISHED'
 
   return (
     <Card
       hover
       onClick={() => navigate(`/jogo/${game.id}`)}
-      className="animate-fade-in"
+      className={cn(
+        'animate-fade-in relative overflow-hidden',
+        isLive && 'border-accent-win/50 shadow-[0_0_20px_rgba(34,197,94,0.12)]',
+      )}
     >
-      {/* League + time */}
+      {/* LIVE top bar stripe */}
+      {isLive && (
+        <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-accent-win via-green-400 to-accent-win animate-pulse" />
+      )}
+
+      {/* League + time / live badge */}
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
-        <span className="text-2xs font-bold text-brand uppercase tracking-widest">
+        <span className="text-2xs font-bold text-brand uppercase tracking-widest truncate">
           {game.league}
         </span>
-        <div className="flex items-center gap-1 text-text-muted">
-          <Clock size={11} />
-          <span className="text-2xs font-mono">{formatTime(game.date)}</span>
-        </div>
+
+        {isLive ? (
+          <div className="flex items-center gap-1.5 bg-accent-win/10 border border-accent-win/30 rounded-full px-2 py-0.5">
+            <Radio size={10} className="text-accent-win animate-pulse" />
+            <span className="text-2xs font-black text-accent-win tracking-wide">AO VIVO</span>
+            {game.liveMinute && (
+              <span className="text-2xs font-mono text-accent-win/80">{game.liveMinute}</span>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-1 text-text-muted">
+            <Clock size={11} />
+            <span className="text-2xs font-mono">{formatTime(game.date)}</span>
+          </div>
+        )}
       </div>
 
-      {/* Teams + form + score ring */}
+      {/* Teams + form + score */}
       <div className="px-4 pb-3">
         <div className="flex items-center gap-3">
+
           {/* Home */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-xl">{game.homeTeam.logoEmoji}</span>
-              <span className="font-bold text-sm text-text-primary truncate">
+              <TeamLogo logoUrl={game.homeTeam.logoUrl} name={game.homeTeam.name} size="sm" />
+              <span className={cn(
+                'font-bold text-sm truncate',
+                isLive && game.homeScore != null && game.awayScore != null && game.homeScore > game.awayScore
+                  ? 'text-accent-win'
+                  : 'text-text-primary',
+              )}>
                 {game.homeTeam.name}
               </span>
             </div>
             <FormStrip form={game.homeTeamStats.formLast5} size="sm" />
           </div>
 
-          {/* Score ring + VS */}
+          {/* Centre score / ring */}
           <div className="flex flex-col items-center gap-1 shrink-0">
-            <ScoreRing value={game.dataQualityScore} size={38} />
-            <span className="text-2xs text-text-muted font-bold">vs</span>
+            {isLive && game.homeScore !== null && game.awayScore !== null ? (
+              <div className="flex items-center gap-0 bg-accent-win/10 border border-accent-win/30 rounded-xl px-3 py-1.5">
+                <span className="text-xl font-black text-text-primary tabular-nums w-6 text-center">
+                  {game.homeScore}
+                </span>
+                <span className="text-accent-win font-bold mx-1">–</span>
+                <span className="text-xl font-black text-text-primary tabular-nums w-6 text-center">
+                  {game.awayScore}
+                </span>
+              </div>
+            ) : isFinished && game.homeScore !== null ? (
+              <div className="flex items-center gap-0 bg-surface-raised rounded-xl px-3 py-1.5">
+                <span className="text-base font-black text-text-secondary tabular-nums w-5 text-center">
+                  {game.homeScore}
+                </span>
+                <span className="text-text-muted font-bold mx-1 text-sm">–</span>
+                <span className="text-base font-black text-text-secondary tabular-nums w-5 text-center">
+                  {game.awayScore}
+                </span>
+              </div>
+            ) : (
+              <ScoreRing value={game.dataQualityScore} size={38} />
+            )}
+            <span className="text-2xs text-text-muted font-bold">
+              {isLive ? (game.liveMinute ?? '●') : isFinished ? 'FT' : 'vs'}
+            </span>
           </div>
 
           {/* Away */}
           <div className="flex-1 min-w-0 text-right">
             <div className="flex items-center justify-end gap-2 mb-2">
-              <span className="font-bold text-sm text-text-primary truncate">
+              <span className={cn(
+                'font-bold text-sm truncate',
+                isLive && game.homeScore != null && game.awayScore != null && game.awayScore > game.homeScore
+                  ? 'text-accent-win'
+                  : 'text-text-primary',
+              )}>
                 {game.awayTeam.name}
               </span>
-              <span className="text-xl">{game.awayTeam.logoEmoji}</span>
+              <TeamLogo logoUrl={game.awayTeam.logoUrl} name={game.awayTeam.name} size="sm" />
             </div>
             <div className="flex justify-end">
               <FormStrip form={game.awayTeamStats.formLast5} size="sm" />
@@ -76,48 +138,27 @@ export function GameCard({ game }: GameCardProps) {
         </div>
       </div>
 
-      {/* Injuries warning */}
-      {game.injuries.filter(i => i.severity === 'high' && i.isKeyPlayer).length > 0 && (
-        <div className="mx-4 mb-3 px-2 py-1.5 bg-accent-lossBg border border-accent-loss/20 rounded-lg">
-          <p className="text-2xs text-accent-loss font-medium">
-            🏥 {game.injuries.filter(i => i.severity === 'high' && i.isKeyPlayer).map(i => i.player).join(', ')} — lesionado
-          </p>
-        </div>
-      )}
-
-      {/* Best pick */}
-      {topPick && (
-        <div className="mx-4 mb-4 flex items-center justify-between bg-surface-raised rounded-lg px-3 py-2">
-          <div>
-            <p className="text-2xs text-text-muted">Melhor aposta</p>
-            <p className="text-xs font-bold text-text-primary">{topPick.pick}</p>
-          </div>
-          <OddBadge odd={topPick.odd} size="sm" />
-        </div>
-      )}
-
-      {/* Odds strip */}
-      {game.odds && (
-        <div className="border-t border-surface-border px-4 py-2.5 flex items-center gap-2">
-          {[
-            { label: '1', odd: game.odds.homeWin },
-            { label: 'X', odd: game.odds.draw },
-            { label: '2', odd: game.odds.awayWin },
-          ].map(({ label, odd }) => (
-            <div key={label} className="flex-1 text-center">
-              <p className="text-2xs text-text-muted mb-0.5">{label}</p>
-              <p className="text-xs font-bold font-mono text-accent-draw">{odd.toFixed(2)}</p>
+      {/* Stats row */}
+      {(game.stats.bttsPct != null || game.stats.over25Pct != null || game.stats.avgGoals != null) && (
+        <div className="mx-4 mb-3 flex items-center gap-4 px-3 py-2 bg-surface-raised rounded-lg">
+          {game.stats.avgGoals != null && (
+            <div className="text-center flex-1">
+              <p className="text-2xs text-text-muted">Media Golos</p>
+              <p className="text-xs font-bold text-text-primary">{game.stats.avgGoals.toFixed(1)}</p>
             </div>
-          ))}
-          <div className="h-6 w-px bg-surface-border" />
-          <div className="flex-1 text-center">
-            <p className="text-2xs text-text-muted mb-0.5">BTTS</p>
-            <p className="text-xs font-bold font-mono text-text-secondary">{game.odds.bttsYes.toFixed(2)}</p>
-          </div>
-          <div className="flex-1 text-center">
-            <p className="text-2xs text-text-muted mb-0.5">+2.5</p>
-            <p className="text-xs font-bold font-mono text-text-secondary">{game.odds.over25.toFixed(2)}</p>
-          </div>
+          )}
+          {game.stats.bttsPct != null && (
+            <div className="text-center flex-1">
+              <p className="text-2xs text-text-muted">BTTS</p>
+              <p className="text-xs font-bold text-text-primary">{game.stats.bttsPct}%</p>
+            </div>
+          )}
+          {game.stats.over25Pct != null && (
+            <div className="text-center flex-1">
+              <p className="text-2xs text-text-muted">Over 2.5</p>
+              <p className="text-xs font-bold text-text-primary">{game.stats.over25Pct}%</p>
+            </div>
+          )}
         </div>
       )}
 

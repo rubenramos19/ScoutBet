@@ -1,10 +1,14 @@
-const BASE_URL    = 'https://v3.football.api-sports.io'
-const API_KEY     = import.meta.env.VITE_API_FOOTBALL_KEY as string | undefined
+// ─── api-sports / api-football v3 ─────────────────────────────────────────────
+// Routes through Vite proxy (dev) or Vercel function (prod) to bypass CORS.
+// Free tier: 100 req/day, no monthly cap.
+// Key: VITE_API_FOOTBALL_KEY in .env
+
+const BASE_URL    = '/api/apisports'  // Vite proxy (dev) or Vercel fn (prod)
 const DAILY_LIMIT = 100
 
 let dailyCallCount = 0
-export function getApiCallCount(): number { return dailyCallCount }
-export function getRemainingCalls(): number { return Math.max(0, DAILY_LIMIT - dailyCallCount) }
+export function getApiCallCount(): number    { return dailyCallCount }
+export function getRemainingCalls(): number  { return Math.max(0, DAILY_LIMIT - dailyCallCount) }
 
 export const API_CONFIG = {
   season: parseInt(import.meta.env.VITE_FOOTBALL_SEASON ?? '2025', 10),
@@ -14,18 +18,8 @@ export const API_CONFIG = {
     .filter((n: number) => !isNaN(n)),
 }
 
-if (typeof window !== 'undefined') {
-  console.info(
-    '[ScoutBet] API config — key: ' + (API_KEY ? 'SET' : 'MISSING') +
-    ' | mock: ' + (import.meta.env.VITE_USE_MOCK ?? 'false') +
-    ' | season: ' + API_CONFIG.season +
-    ' | leagues: ' + API_CONFIG.watchedLeagues.join(',')
-  )
-}
-
-// International competitions use season = calendar year (e.g. World Cup 2026 -> season 2026)
-// Club leagues use VITE_FOOTBALL_SEASON (e.g. Premier League 2025/26 -> season 2025)
-// Add an ID here when a new global tournament is added to DISCOVERY_LEAGUES.
+// International competitions use season = calendar year (e.g. WC 2026 → season 2026)
+// Club leagues use VITE_FOOTBALL_SEASON (e.g. PL 2025/26 → season 2025)
 const INTERNATIONAL_COMPETITION_IDS = new Set([
   1,   // FIFA World Cup
   4,   // UEFA European Championship
@@ -36,12 +30,6 @@ const INTERNATIONAL_COMPETITION_IDS = new Set([
   10,  // CONCACAF Championship
 ])
 
-/**
- * Returns the correct API-Football season param for a given competition.
- * Club leagues  -> VITE_FOOTBALL_SEASON (e.g. 2025)
- * International -> current calendar year (e.g. 2026)
- * No hardcoded years anywhere else in the codebase.
- */
 export function resolveCompetitionSeason(leagueId: number): number {
   return INTERNATIONAL_COMPETITION_IDS.has(leagueId)
     ? new Date().getFullYear()
@@ -52,8 +40,7 @@ export function isInternationalCompetition(leagueId: number): boolean {
   return INTERNATIONAL_COMPETITION_IDS.has(leagueId)
 }
 
-// Ordered by prestige. No season field — resolved at runtime via resolveCompetitionSeason().
-// To add a competition: append here and, if single-year international, add ID above.
+// Ordered by prestige. Discovery tries each league until top-5 found.
 export const DISCOVERY_LEAGUES: ReadonlyArray<{ id: number; label: string }> = [
   { id: 1,   label: 'FIFA World Cup' },
   { id: 4,   label: 'UEFA Euro' },
@@ -62,6 +49,7 @@ export const DISCOVERY_LEAGUES: ReadonlyArray<{ id: number; label: string }> = [
   { id: 2,   label: 'UEFA Champions League' },
   { id: 15,  label: 'FIFA Club World Cup' },
   { id: 3,   label: 'UEFA Europa League' },
+  { id: 848, label: 'UEFA Conference League' },
   { id: 39,  label: 'Premier League' },
   { id: 140, label: 'La Liga' },
   { id: 78,  label: 'Bundesliga' },
@@ -69,6 +57,8 @@ export const DISCOVERY_LEAGUES: ReadonlyArray<{ id: number; label: string }> = [
   { id: 61,  label: 'Ligue 1' },
   { id: 94,  label: 'Primeira Liga' },
 ]
+
+// ── Types ──────────────────────────────────────────────────────────────────────
 
 export interface ApiFixture {
   fixture: {
@@ -146,87 +136,45 @@ interface ApiResponse<T> {
   paging:   { current: number; total: number }
 }
 
-interface FetchOptions {
-  maxRetries?:    number
-  retryDelayMs?:  number
-}
+// ── HTTP client ────────────────────────────────────────────────────────────────
 
 export async function apiFetch<T>(
   endpoint: string,
   params:   Record<string, string | number>,
-  opts:     FetchOptions = {},
 ): Promise<T> {
-  if (!API_KEY) {
-    throw new Error('API_KEY_MISSING: Set VITE_API_FOOTBALL_KEY in .env')
-  }
-
   if (dailyCallCount >= DAILY_LIMIT * 0.8) {
-    console.warn(
-      '[ScoutBet] API budget: ' + dailyCallCount + '/' + DAILY_LIMIT +
-      ' calls used today (' + getRemainingCalls() + ' remaining)'
-    )
+    console.warn(`[API] Budget: ${dailyCallCount}/${DAILY_LIMIT} calls used`)
   }
-
   if (dailyCallCount >= DAILY_LIMIT) {
-    throw new Error(
-      'API_LIMIT_REACHED: ' + DAILY_LIMIT + ' calls used today. Resets at midnight UTC.'
-    )
+    throw new Error(`API_LIMIT_REACHED: ${DAILY_LIMIT} calls used today.`)
   }
 
-  const url = new URL(BASE_URL + endpoint)
+  const url = new URL(BASE_URL + endpoint, window.location.origin)
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)))
 
-  const { maxRetries = 2, retryDelayMs = 800 } = opts
-  let lastError: Error = new Error('Unknown error')
+  dailyCallCount++
+  console.debug(`[API] #${dailyCallCount} ${endpoint}`, Object.fromEntries(url.searchParams))
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    if (attempt > 0) {
-      await new Promise(r => setTimeout(r, retryDelayMs * Math.pow(2, attempt - 1)))
-      console.warn('[API] Retry ' + attempt + '/' + maxRetries + ' -> ' + endpoint)
-    }
+  const res = await fetch(url.toString(), {
+    headers: { 'Accept': 'application/json' },
+    signal: AbortSignal.timeout(12_000),
+  })
 
-    try {
-      dailyCallCount++
-      console.debug('[API] #' + dailyCallCount + ' ' + endpoint, Object.fromEntries(url.searchParams))
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`HTTP ${res.status} ${endpoint} — ${body.slice(0, 200)}`)
+  }
 
-      const res = await fetch(url.toString(), {
-        headers: {
-          'x-apisports-key': API_KEY,
-          'Content-Type':    'application/json',
-        },
-        signal: AbortSignal.timeout(10_000),
-      })
+  const json = (await res.json()) as ApiResponse<T>
 
-      if (res.status === 429) {
-        dailyCallCount--
-        const wait = parseInt(res.headers.get('Retry-After') ?? '60', 10)
-        console.warn('[API] Rate limited — waiting ' + wait + 's')
-        await new Promise(r => setTimeout(r, wait * 1000))
-        continue
-      }
-
-      if (!res.ok) {
-        throw new Error('HTTP ' + res.status + ' ' + res.statusText + ' — ' + endpoint)
-      }
-
-      const json = (await res.json()) as ApiResponse<T>
-
-      if (json.errors && Array.isArray(json.errors) && json.errors.length > 0) {
-        throw new Error('API error on ' + endpoint + ': ' + JSON.stringify(json.errors))
-      }
-
-      return json.response
-
-    } catch (err) {
-      dailyCallCount = Math.max(0, dailyCallCount - (attempt === 0 ? 0 : 1))
-      lastError = err instanceof Error ? err : new Error(String(err))
-      if (attempt < maxRetries) {
-        console.warn('[API] Attempt ' + (attempt + 1) + ' failed:', lastError.message)
-      }
+  if (json.errors && Array.isArray(json.errors) && json.errors.length > 0) {
+    const errStr = JSON.stringify(json.errors)
+    if (errStr !== '[]' && errStr !== '{}') {
+      throw new Error(`API error on ${endpoint}: ${errStr}`)
     }
   }
 
-  throw lastError
+  return json.response
 }
 
 export function todayUTC(): string {
